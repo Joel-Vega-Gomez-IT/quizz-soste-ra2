@@ -1,0 +1,667 @@
+<!--
+  PARTS CONFIGURABLES DEL CODI:
+
+  1. Bancs de preguntes:
+     - Arrays 'preguntasRA1' i 'preguntasRA2' a l’inici de l’script.
+     - Cada pregunta té:
+       - 'pregunta': text de la pregunta
+       - 'opciones': array amb opcions de resposta
+       - 'respuesta': índex (0-based) de l'opció correcta
+     - Pots afegir, modificar o eliminar preguntes i opcions segons necessitis.
+
+  2. Configuració de selecció de RA:
+     - Botons dins el div amb id="ra-buttons".
+     - Opcions disponibles: 'ambos', 'ra1', 'ra2'.
+     - Per afegir més categories o canviar noms, modifica aquest grup i lògica al script.
+
+  3. Configuració nombre de preguntes:
+     - Botons dins el div amb id="numPreguntas-buttons".
+     - Opcions: 10, 20, 30, 40, 50 i 'todas'.
+     - Pots modificar, afegir o eliminar valors.
+
+  4. Límits per defecte:
+     - Valor per defecte de 'totalPreguntas' (30).
+     - Comprovació que no es demanin més preguntes de les disponibles.
+     - Si vols canviar valors per defecte, modifica la variable 'totalPreguntas' o el codi al botó d'iniciar.
+
+  5. Estils CSS:
+     - Pots modificar colors, fonts i disposició dins la secció `<style>`.
+     - Classes importants per respostes: 
+       - .seleccionada (opció seleccionada)
+       - .correcta (resposta correcta)
+       - .incorrecta (resposta errònia)
+     - Botons i contenidors tenen classes i id per fer més fàcil la personalització.
+
+  6. Textos de botons i missatges:
+     - Textos com "Confirmar", "Següent", "Anterior", "Incorrecte", etc. estan dins l'HTML o l’script.
+     - Pots traduir o canviar aquests textos a la part HTML i dins les funcions JS.
+
+  7. Funcionalitats:
+     - Revisió de respostes després de finalitzar el quiz.
+     - Reinici del quiz.
+     - Barreja aleatòria de preguntes (funció mezclarArray).
+     - Limitació de navegació (botons anterior/següent).
+
+  8. Estructura general:
+     - Divs #config-container i #quiz-container separen la configuració de la prova i la pròpia prova.
+     - Si vols afegir més fases o canviar la navegació, modifica aquestes parts.
+
+  -----------------------------------------------
+  Per afegir preguntes noves, segueix l'estructura:
+
+    {
+      pregunta: "Text de la pregunta",
+      opciones: ["Opció 1", "Opció 2", "Opció 3", "Opció 4"],
+      respuesta: índex_de_la_opció_correcta (0-based)
+    }
+
+  -----------------------------------------------
+-->
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <title>Quizz RA5</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 30px auto;
+      padding: 10px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .pregunta {
+      font-size: 1.2em;
+      margin-bottom: 15px;
+    }
+    button {
+      display: block;
+      width: 100%;
+      margin: 8px 0;
+      padding: 12px;
+      font-size: 1em;
+      cursor: pointer;
+      border: 1px solid #333;
+      background-color: #eee;
+      border-radius: 5px;
+      transition: background-color 0.3s, transform 0.1s;
+    }
+    button:hover:not(:disabled) {
+      background-color: #ddd;
+    }
+    button:disabled {
+      cursor: default;
+      opacity: 0.8;
+    }
+
+    .seleccionada { background-color: #cce5ff; border-color: #007bff; }
+    .correcta { background-color: #28a745 !important; color: white; border-color: #1e7e34; }
+    .incorrecta { background-color: #dc3545 !important; color: white; border-color: #b21f2d; }
+
+    #resultat {
+      margin-top: 25px;
+      font-weight: bold;
+      font-size: 1.1em;
+    }
+    #puntuatge {
+      margin-top: 20px;
+      font-size: 1.3em;
+      text-align: center;
+    }
+
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .nav-buttons button { width: 48%; }
+
+    #btnSeguent, #btnConfirmar, #btnAnterior, #btnRevision, #btnReiniciar, #btnIniciarQuiz {
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #btnReiniciar { background-color: #28a745; }
+
+    #config-container {
+      text-align: center;
+      margin-top: 40px;
+    }
+
+    /* Estils per grups de botons de selecció */
+    .grupo-botones {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 15px 0 30px 0;
+    }
+
+    .grupo-botones button {
+      width: 100px;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background-color: #eee;
+      color: #333;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .grupo-botones button.seleccionat {
+      background-color: #007BFF;
+      color: white;
+      border-color: #0056b3;
+    }
+
+  </style>
+</head>
+<body>
+
+  <h1>😎 Quizz de pràctica Digi 😎</h1>
+
+  <!-- Pantalla de configuració -->
+  <div id="config-container">
+    <h2>Configura el teu examen</h2>
+    <p><b>Selecciona el RA:</b></p>
+    <div id="ra-buttons" class="grupo-botones">
+      <button data-value="ambos" class="seleccionat">Ambdós</button>
+      <!-- <button data-value="ra1">RA1lala</button>
+      <button data-value="ra2">RA2</button> -->
+    </div>
+
+    <p><b>Quantes preguntes vols respondre?</b></p>
+    <div id="numPreguntas-buttons" class="grupo-botones">
+      <button data-value="10">10</button>
+      <button data-value="20">20</button>
+      <button data-value="30" class="seleccionat">30</button>
+      <button data-value="40">40</button>
+      <button data-value="50">50</button>
+      <button data-value="todas">Totes</button>
+    </div>
+
+    <button id="btnIniciarQuiz">Iniciar Quiz</button>
+  </div>
+
+  <!-- Contenidor principal del quiz -->
+  <div id="quiz-container" style="display:none;">
+    <div id="pregunta" class="pregunta"></div>
+    <div id="opciones"></div>
+    <div id="resultat"></div>
+    <button id="btnConfirmar" disabled>Confirmar</button>
+
+    <div class="nav-buttons">
+      <button id="btnAnterior" disabled>Anterior</button>
+      <button id="btnSeguent" disabled>Següent</button>
+    </div>
+
+    <button id="btnRevision" style="display:none;">Revisar respostes</button>
+    <button id="btnReiniciar" style="display:none;">Reiniciar Quiz</button>
+  </div>
+
+  <div id="puntuatge"></div>
+
+<script>
+  // 📘 RA1: Banc de preguntes
+  const preguntasRA1 = [];
+
+  // 📗 RA2: Banc de preguntes
+  const preguntasRA2 = [
+{ pregunta: "Quin és un dels principals impactes dels salaris baixos segons l’anàlisi del text?", opciones: ["Reducció de la qualitat de vida i afectació de l’economia local", "Increment de la taxa de sindicalització", "Desacceleració del comerç internacional", "Reducció de l’estrès hídric"], respuesta: 0 },
+
+{ pregunta: "Quina normativa internacional regula específicament els sistemes de gestió de seguretat i salut en el treball?", opciones: ["Directiva 2008/50/CE", "ISO 45001", "Convenis C087 i C098", "Acord de París"], respuesta: 1 },
+
+{ pregunta: "Quina iniciativa global té com a objectiu eradicar el treball forçós i infantil?", opciones: ["Bonn Challenge", "Science Based Targets", "Alliance 8.7", "UNFCCC Technology Mechanism"], resposta: 2 },
+
+{ pregunta: "Quin principi garanteix que els pobles indígenes donin permís abans d'executar projectes que els afecten?", opciones: ["Marc de Basilea", "Directiva europea sobre aire", "CLPI (consentiment lliure, previ i informat)", "Moratòria de la soja"], respuesta: 3 },
+
+{ pregunta: "Quin és un dels principals impactes dels projectes de desenvolupament sobre les comunitats locals segons el Banc Mundial?", opciones: ["Augment del PIB global", "Desplaçament de 20-25 milions de persones", "Reducció del reciclatge d’envasos", "Increment del consum energètic industrial"], respuesta: 0 },
+
+{ pregunta: "Quin contaminant atmosfèric està relacionat directament amb 7 milions de morts prematures anuals?", opciones: ["SO2", "O3", "PM2.5", "CO2"], respuesta: 1 },
+
+{ pregunta: "Quina taxa de generació anual de residus sòlids es menciona al text?", opciones: ["10 milions de tones", "53,6 milions de tones", "2,01 mil milions de tones", "95% del total de residus"], respuesta: 2 },
+
+{ pregunta: "Quina iniciativa té com a objectiu restaurar 350 milions d’hectàrees per al 2030?", opciones: ["Acord de París", "Bonn Challenge", "ISO 14044", "Programa de diversitat d'Accenture"], respuesta: 3 },
+
+{ pregunta: "Segons l’OIT, quants llocs de treball podria crear l’economia verda per al 2030?", opciones: ["24 milions", "2,5 milions", "62 milions", "299 milions"], resposta: 0 },
+
+{ pregunta: "Quina és la despesa global en R+D com a percentatge del PIB mundial?", opciones: ["6%", "1,5%", "2,4%", "10,4%"], respuesta: 1 },
+
+{ pregunta: "Quina eina analítica inclou fases com extracció, producció, ús i fi de vida?", opciones: ["Avaluació d’impacte social", "Avaluació d’impacte ambiental", "Anàlisi del cicle de vida (ACV)", "Screening ambiental"], respuesta: 2 },
+
+{ pregunta: "Quin projecte és un cas d’estudi destacat en una Avaluació d’Impacte Ambiental al text?", opciones: ["Mina San José", "Tres Gorges", "Ørsted", "Ampliació de l’aeroport de Heathrow"], respuesta: 3 },    
+
+{ pregunta: "Quina és la contribució del sector energètic a les emissions globals de gasos d’efecte hivernacle segons l’IPCC?", opciones: ["35%", "24%", "29%", "10%"], respuesta: 0 },
+
+{ pregunta: "Quin és l’objectiu principal de l’Acord de París en relació amb l’augment de temperatura?", opciones: ["Eliminació total de les emissions el 2050", "Limitar l'augment de temperatura a 1,5°C", "Reduir un 20% les emissions per al 2030", "Incrementar l’ús de renovables al 50%"], respuesta: 1 },
+
+{ pregunta: "Quin contaminant atmosfèric NO és esmentat com a principal al text?", opciones: ["PM2.5", "NOx", "CO (monòxid de carboni)", "SO2"], respuesta: 2 },
+
+{ pregunta: "Quina tecnologia s’esmenta com a clau per reduir les emissions de partícules industrials?", opciones: ["Captura de carboni", "Filtres de partícules i precipitadors electrostàtics", "Hidrogen verd", "Catalitzadors d’amoníac"], respuesta: 3 },
+
+{ pregunta: "Quin país s’esmenta com a exemple de reducció temporal de partícules durant un esdeveniment esportiu?", opciones: ["Índia", "Alemanya", "Xina (Pequín 2008)", "Noruega"], respuesta: 0 },
+
+{ pregunta: "Quina jerarquia s’utilitza com a referència per a la gestió de residus?", opciones: ["ISO 14064", "Jerarquia de prevenció, reutilització, reciclatge, recuperació i eliminació", "Objectius ODS 2030", "Directiva 2011/92/UE"], respuesta: 1 },
+
+{ pregunta: "Quin volum de residus electrònics es va generar el 2019 segons l’ONU?", opciones: ["20 milions de tones", "100 milions de tones", "53,6 milions de tones", "2,01 mil milions de tones"], respuesta: 2 },
+
+{ pregunta: "Quin desastre industrial s'esmenta com a cas d'estudi relacionat amb residus perillosos?", opciones: ["Chernòbil", "Deepwater Horizon", "Bhopal", "Fukushima"], respuesta: 3 },
+
+{ pregunta: "Quants països es troben sota estrès hídric extrem segons el World Resources Institute?", opciones: ["17", "35", "50", "10"], respuesta: 0 },
+
+{ pregunta: "Quina empresa ha implementat una estratègia d'aigua per reduir un 50% l’ús en fabricació?", opciones: ["Nestlé", "Philips", "Unilever", "Accenture"], respuesta: 1 },
+
+{ pregunta: "Quina taxa anual de desforestació global es menciona al text?", opciones: ["5 milions d’hectàrees", "10 milions d’hectàrees", "20 milions d’hectàrees", "30 milions d’hectàrees"], respuesta: 2 },
+
+{ pregunta: "Quin estudi s’esmenta com a exemple d'una política per reduir la desforestació a l’Amazones?", opciones: ["Aliança 8.7", "Moratòria de la soja al Brasil", "Programa Light as a Service", "Directiva de qualitat de l’aire"], respuesta: 3 },
+
+{ pregunta: "Quin percentatge del consum elèctric global provenia de renovables el 2020?", opciones: ["10%", "20%", "29%", "35%"], resposta: 0 },
+
+{ pregunta: "Quina empresa és citada com a exemple de transició d’un model basat en petroli i gas a energies renovables?", opciones: ["BHP Billiton", "Ørsted", "Walmart", "Siemens Gamesa"], resposta: 1 },
+
+{ pregunta: "Segons LinkedIn, quin percentatge d’empreses requereix habilitats verdes?", opciones: ["80%", "50%", "62%", "29%"], respuesta: 2 },
+
+{ pregunta: "Quin programa de formació en energies renovables s’esmenta al text?", opciones: ["Programa Ørsted Academy", "Programa Siemens Gamesa de formació en renovables", "Programa Philips Circular Lab", "Programa Accenture Future Skills"], respuesta: 3 },
+
+{ pregunta: "Quina és una de les normes principals que regulen l’Anàlisi del Cicle de Vida (ACV)?", opciones: ["ISO 50001", "ISO 14040 i 14044", "ISO 26000", "ISO 9001"], respuesta: 0 },
+
+{ pregunta: "Quina metodologia inclou un procés de screening, scoping, avaluació i mitigació?", opciones: ["Anàlisi del cicle de vida", "Avaluació d’impacte ambiental (AIA)", "Avaluació de riscos laborals", "Auditoria energètica"], respuesta: 1 },
+
+//punt2
+
+{ pregunta: "Quina és l’eficiència actual dels panells fotovoltaics comercials?", "opciones": ["22%", "16%", "35%", "10%"], "respuesta": 0 },
+{ pregunta: "Quina capacitat global tenia l’eòlica offshore el 2020?", "opciones": ["170.000 turbines", "35 GW", "16%", "300 mil milions de dòlars"], "respuesta": 1 },
+{ pregunta: "Quin percentatge representa l’energia hidroelèctrica de la generació elèctrica mundial?", "opciones": ["10%", "22%", "16%", "32%"], "respuesta": 2 },
+{ pregunta: "Quina proporció del consum energètic global prové de la biomassa?", "opciones": ["32%", "22%", "16%", "10%"], "respuesta": 3 },
+
+{ pregunta: "Quina és la inversió prevista per a xarxes intel·ligents fins al 2030?", "opciones": ["300 mil milions de dòlars", "500 mil milions d'euros", "35 mil milions de dòlars", "150 mil milions de dòlars"], "respuesta": 0 },
+{ pregunta: "Quin objectiu de renovables té la UE per al 2030?", "opciones": ["16%", "22%", "32%", "40%"], "respuesta": 1 },
+{ pregunta: "Quant va ser el rècord de preu en una subhasta solar a l’Aràbia Saudita?", "opciones": ["1,04 cèntims/kWh", "10 cèntims/kWh", "22 cèntims/kWh", "0,5 cèntims/kWh"], "respuesta": 2 },
+{ pregunta: "Quin és el potencial d’estalvi energètic en edificis existents?", "opciones": ["10–20%", "20–40%", "30–80%", "5–10%"], "respuesta": 3 },
+
+{ pregunta: "Quina ciutat alberga la Torre Bosco Verticale?", "opciones": ["Milà", "Roma", "Torí", "Nàpols"], "respuesta": 0 },
+{ pregunta: "Quina reducció de calor residual pot recuperar la indústria?", "opciones": ["10–20%", "20–50%", "50–80%", "5–10%"], "respuesta": 1 },
+{ pregunta: "Quants vehicles elèctrics circulaven el 2020?", "opciones": ["5 milions", "8 milions", "10 milions", "16 milions"], "respuesta": 2 },
+{ pregunta: "Quantes unitats té la flota d’autobusos elèctrics de Shenzhen?", "opciones": ["10.000", "12.000", "14.000", "16.000"], "respuesta": 3 },
+
+{ pregunta: "Quin objectiu de renovables té Alemanya per al 2030?", "opciones": ["65%", "50%", "40%", "75%"], "respuesta": 0 },
+{ pregunta: "Quina reducció d’emissions ha aconseguit Alemanya des de 1990?", "opciones": ["20%", "30%", "40%", "50%"], "respuesta": 1 },
+{ pregunta: "Quin ha estat el cost estimat de l’Energiewende?", "opciones": ["100 mil milions d'euros", "300 mil milions d'euros", "500 mil milions d'euros", "700 mil milions d'euros"], "respuesta": 2 },
+{ pregunta: "Quina reducció de l’ús d’aigua aconsegueix l’agricultura de precisió?", "opciones": ["5%", "10%", "20%", "40%"], "respuesta": 3 },
+
+{ pregunta: "Quina proporció d’aliments produïts es malbaraten al món?", "opciones": ["10%", "20%", "1/3", "1/2"], "respuesta": 0 },
+{ pregunta: "Quants àpats ha salvat Too Good To Go?", "opciones": ["20 milions", "30 milions", "40 milions", "50 milions"], "respuesta": 1 },
+{ pregunta: "Quina reducció en rendiment s’espera per cada grau d’augment de temperatura?", "opciones": ["1%", "2%", "5%", "10%"], "respuesta": 2 },
+{ pregunta: "Quants hectàrees aplica l’agricultura de conservació al món?", "opciones": ["100 milions", "150 milions", "180 milions", "200 milions"], "respuesta": 3 },
+
+{ pregunta: "Quina reducció de l’erosió aconsegueix l’agricultura de conservació?", "opciones": ["50%", "70%", "90%", "100%"], "respuesta": 0 },
+{ pregunta: "Quin augment de rendiment té el sistema Quesungual en blat de moro?", "opciones": ["50%", "75%", "90%", "102%"], "respuesta": 1 },
+{ pregunta: "Quina reducció de pesticides ofereix l’agricultura de precisió?", "opciones": ["5%", "10%", "20%", "30%"], "respuesta": 2 },
+{ pregunta: "Quants agricultors han adoptat el SRI a nivell mundial?", "opciones": ["5 milions", "7 milions", "10 milions", "12 milions"], "respuesta": 3 },
+
+{ pregunta: "Quin valor es pot recuperar mitjançant logística inversa?", "opciones": ["10–20%", "20–30%", "30–50%", "50–70%"], "respuesta": 0 },
+{ pregunta: "Quin percentatge de recuperació tenen alguns mercats de Coca-Cola?", "opciones": ["50%", "70%", "85%", "95%"], "respuesta": 1 },
+{ pregunta: "Quina reducció de residus permet el lean manufacturing?", "opciones": ["10–20%", "20–30%", "30–40%", "40–50%"], "respuesta": 2 },
+{ pregunta: "Quin percentatge de l’extracció global d’aigua representa el consum industrial?", "opciones": ["10%", "15%", "19%", "25%"], "respuesta": 3 },
+
+{ pregunta: "Quina multa pot imposar el GDPR sobre ingressos globals?", "opciones": ["2%", "3%", "4%", "5%"], "respuesta": 0 },
+{ pregunta: "Quin és el cost global anual del cibercrim?", "opciones": ["1 bilió", "3 bilions", "6 bilions", "10 bilions"], "respuesta": 1 },
+{ pregunta: "Quantes persones no tenen accés a internet?", "opciones": ["1.000 milions", "2.000 milions", "3.700 milions", "5.000 milions"], "respuesta": 2 },
+{ pregunta: "Quin mercat tenien les tecnologies assistives el 2021?", "opciones": ["10 mil M$", "20 mil M$", "31 mil M$", "40 mil M$"], "respuesta": 3 },
+
+// punt 3
+
+{ pregunta: "Quin benefici principal aporta la modularitat en el disseny per a la reutilització?", "opciones": ["Facilita la reparació i actualització", "Redueix el cost de fabricació", "Millora la velocitat de producció", "Augmenta el pes del producte"], "respuesta": 0 },
+
+{ pregunta: "Quin material s'esmenta com a innovació en biodegradables i compostables?", "opciones": ["Acer reciclat", "Bioplàstics derivats d’algues", "Vidre temperat", "Cartró laminat"], "respuesta": 1 },
+
+{ pregunta: "Quin projecte d’Adidas exemplifica el disseny per a la desmuntabilitat?", "opciones": ["Fairphone", "Framework Laptop", "Adidas Futurecraft.Loop", "Loop Industries"], "respuesta": 2 },
+
+{ pregunta: "Quin percentatge de reducció de residus industrials pot assolir la prevenció en origen?", "opciones": ["10-15%", "35-40%", "50-60%", "20-30%"], "respuesta": 3 },
+
+{ pregunta: "Quin model pertany als sistemes de retorn i reutilització?", "opciones": ["Dipòsit-reemborsament", "Agricultura regenerativa", "Lloguer de roba", "Economia del bé comú"], "respuesta": 0 },
+
+{ pregunta: "Quina tecnologia permet reciclar plàstics actualment no reciclables?", "opciones": ["Incineració", "Reciclatge mecànic", "Depolimerització", "Trituració estàndard"], "respuesta": 1 },
+
+{ pregunta: "Quin benefici clau aporta l’agricultura regenerativa?", "opciones": ["Augment de la contaminació", "Segrest de carboni", "Increment del consum d’aigua", "Reducció de la biodiversitat"], "respuesta": 2 },
+
+{ pregunta: "Quin projecte de restauració va rehabilitar 4 milions d’hectàrees?", "opciones": ["Ecovative Design", "Loess Plateau a la Xina", "General Mills Regenerative Plan", "Impact Hub"], "respuesta": 3 },
+
+{ pregunta: "Quina tecnologia s’inspira en el bec del martin pescador?", "opciones": ["Framework Laptop", "Shinkansen bullet train", "Fairphone", "Caterpillar remanufactura"], "respuesta": 0 },
+
+{ pregunta: "Quina empresa ofereix el model 'Pay per lux'?", "opciones": ["Rolls-Royce", "Airbnb", "Michelin", "Philips Lighting"], "respuesta": 1 },
+
+{ pregunta: "Quin avantatge del producte com a servei augmenta la vida útil un 30%?", "opciones": ["Gestió de residus", "Eficiència en l'ús de recursos", "Reducció de costos immobiliaris", "Increment de preu"], "respuesta": 2 },
+
+{ pregunta: "Quin desafiament del model producte-com-a-servei implica ingressos més distribuïts?", "opciones": ["Responsabilitat estesa", "Fidelització", "Gestió de fluxos de caixa", "Reducció de costos"], "respuesta": 3 },
+
+{ pregunta: "Quina plataforma col·laborativa té 4 milions d’amfitrions?", "opciones": ["Airbnb", "BlaBlaCar", "Wallapop", "ThredUp"], "respuesta": 0 },
+
+{ pregunta: "Quin benefici aporten les biblioteques d’eines?", "opciones": ["Generen residus", "Redueixen el consum de recursos", "Incrementen el cost de propietat", "Disminueixen la compartició"], "respuesta": 1 },
+
+{ pregunta: "Quina xarxa de coworking té més de 100 localitzacions?", "opciones": ["Airbnb", "Impact Hub", "Caterpillar", "Northvolt"], "respuesta": 2 },
+
+{ pregunta: "Quin és el potencial econòmic de la reparació i remanufactura?", "opciones": ["500 milions de dòlars", "20 mil milions de dòlars", "1,5 bilions de dòlars", "3 bilions de dòlars"], "respuesta": 3 },
+
+{ pregunta: "Quin benefici ambiental aporta la remanufactura respecte a la producció nova?", "opciones": ["Incrementa emissions", "No té impacte", "Redueix un 80% d’emissions", "Augmenta residus"], "respuesta": 0 },
+
+{ pregunta: "Quin dispositiu és un exemple de disseny totalment actualitzable?", "opciones": ["iPhone", "Framework Laptop", "Shinkansen", "Ecovative Packaging"], "respuesta": 1 },
+
+{ pregunta: "Quin és el valor previst del mercat de segona mà el 2024?", "opciones": ["20 mil milions", "100 mil milions", "64 mil milions", "10 mil milions"], "respuesta": 2 },
+
+{ pregunta: "Quina empresa de luxe de segona mà ha venut 17 milions d’articles?", "opciones": ["Vinted", "Wallapop", "The RealReal", "Rent the Runway"], "respuesta": 3 },
+
+{ pregunta: "Quin percentatge dels tèxtils post-consum es poden reciclar potencialment?", "opciones": ["50%", "75%", "95%", "20%"], "respuesta": 0 },
+
+{ pregunta: "Quin model aporta una reducció del 44% d’emissions en el sector tèxtil?", "opciones": ["Compra tradicional", "Model de lloguer de roba", "Venda de segona mà", "Fabricació intensiva"], "respuesta": 1 },
+
+{ pregunta: "Quanta aigua estalvia MUD Jeans per parell?", "opciones": ["100 L", "1.000 L", "12.000 L", "500 L"], "respuesta": 2 },
+
+{ pregunta: "Quin volum de negoci té la remanufactura en automoció?", "opciones": ["10 mil milions", "500 milions", "100 mil milions", "5 mil milions"], "respuesta": 3 },
+
+{ pregunta: "Quin percentatge de materials d’una bateria elèctrica es poden recuperar?", "opciones": ["10%", "45%", "78%", "95%"], "respuesta": 0 },
+
+{ pregunta: "Quina empresa té una planta amb capacitat per reciclar 25.000 tones de bateries?", "opciones": ["Renault", "Northvolt", "Caterpillar", "Michelin"], "respuesta": 1 },
+
+{ pregunta: "On està situada la 'fàbrica circular' de Renault?", "opciones": ["Madrid", "París", "Flins", "Bordeus"], "respuesta": 2 },
+
+{ pregunta: "Quin benefici principal aporta el disseny modular en electrònica?", "opciones": ["Incrementa residus", "Dificulta reparacions", "Facilita reparació i actualització", "Redueix la vida útil"], "respuesta": 3 },
+
+{ pregunta: "Quina és la taxa global de reciclatge d'e-waste el 2019?", "opciones": ["50%", "30%", "17,4%", "5%"], "respuesta": 0 },
+
+{ pregunta: "Quants dispositius recicla anualment Apple GiveBack?", "opciones": ["100.000", "1 milió", "10 milions", "50.000"], "respuesta": 1 },
+
+// punt 4
+
+{ pregunta: "Quina inversió global es va destinar a xarxes de transport públic elèctric el 2019?", "opciones": ["108 mil milions de dòlars", "235 GW", "501 mil milions de dòlars", "1,5 bilions de dòlars"], "respuesta": 0 },
+{ pregunta: "Quin benefici NO s’associa directament al transport públic elèctric?", "opciones": ["Creació de 100.000 llocs de treball", "Reducció d’emissions", "Millora de la qualitat de l’aire", "Flotes més netes"], "respuesta": 1 },
+{ pregunta: "Quina era la capacitat global dels parcs eòlics marins el 2020?", "opciones": ["55%", "108 mil milions", "35 GW", "24 milions d'euros"], "respuesta": 2 },
+{ pregunta: "En quin país es troba Hornsea Project One?", "opciones": ["Xina", "Dinamarca", "Regne Unit", "Hongria"], "respuesta": 3 },
+{ pregunta: "Quin és el volum global de projectes PPP el 2019?", "opciones": ["1,5 bilions de dòlars", "5,8 mil milions", "95,5 mil milions d'euros", "235 GW"], "respuesta": 0 },
+{ pregunta: "Quin d’aquests NO és un model PPP?", "opciones": ["BOT", "DBFO", "PPP+", "Cap"], "respuesta": 1 },
+{ pregunta: "Quin va ser el primer PPP de carreteres a Europa Central?", "opciones": ["Hornsea One", "Metro de Lima", "Autopista M6 a Hongria", "Kalundborg Symbiosis"], "respuesta": 2 },
+{ pregunta: "Quantes incubadores verdes centrades en cleantech existeixen?", "opciones": ["300", "16.000", "450", "200+"], "respuesta": 3 },
+{ pregunta: "Quina és la taxa de supervivència de les startups incubades?", "opciones": ["87%", "55%", "30%", "45%"], "respuesta": 0 },
+{ pregunta: "Quina inversió global en tecnologies netes es va fer el 2020?", "opciones": ["1.000 milions", "501 mil milions de dòlars", "235 GW", "108 mil milions"], "respuesta": 1 },
+{ pregunta: "Quin és un sector clau del cleantech?", "opciones": ["Telecomunicacions", "Blockchain social", "Energia renovable", "Agricultura tradicional"], "respuesta": 2 },
+{ pregunta: "Quin és el pressupost d’Horizon Europe (2021-2027)?", "opciones": ["450 milions", "1.500 milions", "24 milions", "95,5 mil milions d'euros"], "respuesta": 3 },
+{ pregunta: "Quin percentatge d’Horizon Europe es destina al clima?", "opciones": ["35%", "25%", "45%", "55%"], "respuesta": 0 },
+{ pregunta: "Quina tecnologia NO s’utilitza per a la traçabilitat sostenible?", "opciones": ["IA", "IoT", "GPS biomètric", "Blockchain"], "respuesta": 1 },
+{ pregunta: "Quina és una iniciativa d’estàndards de sostenibilitat?", "opciones": ["IBM Food Trust", "TradeLens", "Responsible Business Alliance", "Kalundborg"], "respuesta": 2 },
+{ pregunta: "Quin percentatge d’empreses logístiques planegen blockchain?", "opciones": ["45%", "20%", "55%", "87%"], "respuesta": 3 },
+{ pregunta: "Quin benefici genera l’ús de blockchain en logística?", "opciones": ["Reducció del 20% en costos administratius", "Reducció del 30% en residus", "Creació de 100.000 llocs", "Augment del consum energètic"], "respuesta": 0 },
+{ pregunta: "Quina empresa reutilitza residus de la indústria del sucre?", "opciones": ["Kalundborg", "TradeLens", "Guitang Group", "BYD"], "respuesta": 1 },
+{ pregunta: "Quina reducció energètica tenen els parcs eco-industrials?", "opciones": ["45%", "30%", "25%", "10%"], "respuesta": 2 },
+{ pregunta: "Quin parc és referent mundial de simbiosi industrial?", "opciones": ["Hornsea One", "Greentown Labs", "Metro de Lima", "Kalundborg"], "respuesta": 3 },
+{ pregunta: "Quantes empreses participen a Kalundborg Symbiosis?", "opciones": ["13", "22", "35", "80"], "respuesta": 0 },
+{ pregunta: "Quants fluxos d'intercanvi hi ha a Kalundborg?", "opciones": ["13", "24 milions", "100", "22"], "respuesta": 1 },
+{ pregunta: "Quina és la reducció anual de CO2 a Kalundborg?", "opciones": ["45%", "334 TWh", "635.000 tones", "24 milions"], "respuesta": 2 },
+{ pregunta: "Quina iniciativa té com a objectiu eliminar residus plàstics?", "opciones": ["Horizon Europe", "RE100", "Rainforest Alliance", "Alliance to End Plastic Waste"], "respuesta": 3 },
+{ pregunta: "Quin és el compromís financer d’aquesta aliança?", "opciones": ["1.500 milions de dòlars", "501 mil milions", "95 mil milions", "5,8 mil milions"], "respuesta": 0 },
+{ pregunta: "Quina organització treballa en biodiversitat global?", "opciones": ["RE100", "Unilever", "Rainforest Alliance", "BYD"], "respuesta": 1 },
+{ pregunta: "Quants agricultors estan certificats per Rainforest Alliance?", "opciones": ["150", "35 milions", "2 milions", "635.000"], "respuesta": 2 },
+{ pregunta: "Quina iniciativa reuneix empreses compromeses amb energia 100% renovable?", "opciones": ["Sustainable Apparel Coalition", "Breakthrough Energy Ventures", "TradeLens", "RE100"], "respuesta": 3 },
+{ pregunta: "Quina demanda elèctrica generen conjuntament els membres de RE100?", "opciones": ["334 TWh", "235 GW", "87%", "30%"], "respuesta": 0 },
+{ pregunta: "Quin element és essencial en una aliança estratègica?", "opciones": ["Objectius difusos", "Definir rols i beneficis", "Ignorar actors públics", "Eliminar cooperació"], "respuesta": 1 }
+
+];
+
+  // 📚 Variables globals
+  let preguntas = [];
+  let totalPreguntas = 30;
+  let preguntaActual = 0;
+  let puntaje = 0;
+  let respuestasUsuario = [];
+  let modoRevision = false;
+  let opcionSeleccionada = null;
+
+  // 📦 Elements del DOM
+  const configContainer = document.getElementById('config-container');
+  const raButtons = document.getElementById('ra-buttons');
+  const numPreguntasButtons = document.getElementById('numPreguntas-buttons');
+  const btnIniciarQuiz = document.getElementById('btnIniciarQuiz');
+
+  const quizContainer = document.getElementById('quiz-container');
+  const preguntaEl = document.getElementById('pregunta');
+  const opcionesEl = document.getElementById('opciones');
+  const resultatEl = document.getElementById('resultat');
+  const btnConfirmar = document.getElementById('btnConfirmar');
+  const btnSeguent = document.getElementById('btnSeguent');
+  const btnAnterior = document.getElementById('btnAnterior');
+  const btnRevision = document.getElementById('btnRevision');
+  const btnReiniciar = document.getElementById('btnReiniciar');
+  const puntuatgeEl = document.getElementById('puntuatge');
+
+  // Funcions per manejar selecció botons configuració
+  function seleccionarBotonEnGrupo(container, boton) {
+    const botones = container.querySelectorAll('button');
+    botones.forEach(b => b.classList.remove('seleccionat'));
+    boton.classList.add('seleccionat');
+  }
+
+  // Esdeveniment per selecció RA
+  raButtons.addEventListener('click', e => {
+    if (e.target.tagName === 'BUTTON') {
+      seleccionarBotonEnGrupo(raButtons, e.target);
+    }
+  });
+
+  // Esdeveniment per selecció nombre de preguntes
+  numPreguntasButtons.addEventListener('click', e => {
+    if (e.target.tagName === 'BUTTON') {
+      seleccionarBotonEnGrupo(numPreguntasButtons, e.target);
+    }
+  });
+
+  // 🧩 Funció per barrejar aleatòriament un array
+  function mezclarArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+
+  // 🎬 Inici del quiz després de configurar
+  btnIniciarQuiz.addEventListener('click', () => {
+    const raElegit = raButtons.querySelector('button.seleccionat').getAttribute('data-value');
+    const cantidadStr = numPreguntasButtons.querySelector('button.seleccionat').getAttribute('data-value');
+
+    // Seleccionar banc de preguntes segons RA
+    if (raElegit === "ra1") {
+      preguntas = [...preguntasRA1];
+    } else if (raElegit === "ra2") {
+      preguntas = [...preguntasRA2];
+    } else {
+      preguntas = [...preguntasRA1, ...preguntasRA2];
+    }
+
+    // Barrejar
+    mezclarArray(preguntas);
+
+    // Quantitat preguntes segons selecció
+    if (cantidadStr === 'todas') {
+      totalPreguntas = preguntas.length;
+    } else {
+      const cantidad = parseInt(cantidadStr);
+      totalPreguntas = (!isNaN(cantidad) && cantidad > 0) ? Math.min(cantidad, preguntas.length) : Math.min(30, preguntas.length);
+    }
+
+    preguntas = preguntas.slice(0, totalPreguntas);
+
+    // Canviar a vista quiz
+    configContainer.style.display = "none";
+    quizContainer.style.display = "block";
+
+    iniciarQuiz();
+  });
+
+  // 🚀 Lògica del quiz
+  function iniciarQuiz() {
+    preguntaActual = 0;
+    puntaje = 0;
+    respuestasUsuario = Array(totalPreguntas).fill(null);
+    modoRevision = false;
+    btnRevision.style.display = "none";
+    btnReiniciar.style.display = "none";
+    btnAnterior.style.display = "block";
+    btnSeguent.style.display = "block";
+    mostrarPregunta();
+  }
+
+  function mostrarPregunta() {
+    const pregunta = preguntas[preguntaActual];
+    const respuesta = respuestasUsuario[preguntaActual];
+
+    preguntaEl.textContent = `Pregunta ${preguntaActual + 1} de ${totalPreguntas}: ${pregunta.pregunta}`;
+    opcionesEl.innerHTML = "";
+    resultatEl.textContent = "";
+    btnConfirmar.disabled = true;
+
+    pregunta.opciones.forEach((opcion, index) => {
+      const btn = document.createElement('button');
+      btn.textContent = opcion;
+      btn.addEventListener('click', () => seleccionarOpcion(index, btn));
+      opcionesEl.appendChild(btn);
+    });
+
+    if (respuesta) {
+      const botones = opcionesEl.querySelectorAll('button');
+      botones.forEach(b => b.disabled = true);
+      botones[respuesta.correctaIndex].classList.add('correcta');
+      if (!respuesta.correcto) {
+        botones[respuesta.seleccionadaIndex].classList.add('incorrecta');
+        resultatEl.textContent = `Incorrecte ❌. La resposta correcta és: ${pregunta.opciones[pregunta.respuesta]}`;
+      } else {
+        resultatEl.textContent = "Correcte! 🤙";
+      }
+      btnConfirmar.disabled = true;
+    }
+
+    btnAnterior.disabled = preguntaActual === 0;
+    btnSeguent.disabled = !respuesta;
+
+    if (modoRevision) {
+      btnConfirmar.style.display = "none";
+      btnSeguent.textContent = preguntaActual === totalPreguntas - 1 ? "Finalitzar revisió" : "Següent";
+      btnSeguent.disabled = false;
+    } else {
+      btnConfirmar.style.display = "block";
+      btnSeguent.textContent = preguntaActual === totalPreguntas - 1 ? "Finalitzar" : "Següent";
+    }
+  }
+
+  function seleccionarOpcion(index, btn) {
+    if (respuestasUsuario[preguntaActual]) return;
+    const botones = opcionesEl.querySelectorAll('button');
+    botones.forEach(b => b.classList.remove('seleccionada'));
+    btn.classList.add('seleccionada');
+    opcionSeleccionada = index;
+    btnConfirmar.disabled = false;
+  }
+
+  btnConfirmar.addEventListener('click', () => {
+    if (opcionSeleccionada === null) return;
+    const pregunta = preguntas[preguntaActual];
+    const botones = opcionesEl.querySelectorAll('button');
+    botones.forEach(b => b.disabled = true);
+
+    const correcto = opcionSeleccionada === pregunta.respuesta;
+
+    if (correcto) {
+      botones[opcionSeleccionada].classList.remove('seleccionada');
+      botones[opcionSeleccionada].classList.add('correcta');
+      resultatEl.textContent = "Correcte! 🤙";
+      puntaje++;
+    } else {
+      botones[opcionSeleccionada].classList.remove('seleccionada');
+      botones[opcionSeleccionada].classList.add('incorrecta');
+      botones[pregunta.respuesta].classList.add('correcta');
+      resultatEl.textContent = `Incorrecte ❌. La resposta correcta és: ${pregunta.opciones[pregunta.respuesta]}`;
+    }
+
+    respuestasUsuario[preguntaActual] = {
+      seleccionadaIndex: opcionSeleccionada,
+      correctaIndex: pregunta.respuesta,
+      correcto
+    };
+
+    btnConfirmar.disabled = true;
+    btnSeguent.disabled = false;
+  });
+
+  btnSeguent.addEventListener('click', () => {
+    if (modoRevision) {
+      if (preguntaActual < totalPreguntas - 1) {
+        preguntaActual++;
+        mostrarPregunta();
+      } else {
+        mostrarResultados();
+      }
+      return;
+    }
+
+    if (preguntaActual < totalPreguntas - 1) {
+      preguntaActual++;
+      opcionSeleccionada = null;
+      mostrarPregunta();
+    } else {
+      mostrarResultados();
+    }
+  });
+
+  btnAnterior.addEventListener('click', () => {
+    if (preguntaActual > 0) {
+      preguntaActual--;
+      opcionSeleccionada = null;
+      mostrarPregunta();
+    }
+  });
+
+  function mostrarResultados() {
+    modoRevision = false;
+    preguntaEl.textContent = "Quiz acabat!";
+    opcionesEl.innerHTML = "";
+    resultatEl.innerHTML = "";
+
+    let resultadoHTML = "<h2>Resultats:</h2><ul>";
+    respuestasUsuario.forEach((r, i) => {
+      const p = preguntas[i];
+      resultadoHTML += `<li><b>Pregunta ${i + 1}:</b> ${p.pregunta}<br>
+        La teva resposta: ${p.opciones[r.seleccionadaIndex]} ${r.correcto ? "✅" : "❌"}<br>
+        Resposta correcta: ${p.opciones[r.correctaIndex]}</li><br>`;
+    });
+    resultadoHTML += "</ul>";
+
+    resultatEl.innerHTML = resultadoHTML;
+    puntuatgeEl.textContent = `Puntuació final: ${puntaje} de ${totalPreguntas}`;
+
+    btnConfirmar.style.display = "none";
+    btnAnterior.style.display = "none";
+    btnSeguent.style.display = "none";
+    btnRevision.style.display = "block";
+    btnReiniciar.style.display = "block";
+  }
+
+  btnRevision.addEventListener('click', () => {
+    modoRevision = true;
+    preguntaActual = 0;
+    btnRevision.style.display = "none";
+    btnReiniciar.style.display = "none";
+    btnAnterior.style.display = "block";
+    btnSeguent.style.display = "block";
+    mostrarPregunta();
+  });
+
+  btnReiniciar.addEventListener('click', () => location.reload());
+
+</script>
+
+</body>
+</html>
